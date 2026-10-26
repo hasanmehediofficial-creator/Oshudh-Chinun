@@ -54,6 +54,7 @@ private fun parseDataset(json: String): List<Medicine> {
 }
 private fun readCachedDataset(context: Context): String? =
     runCatching { File(context.filesDir, "medicines-cache.json").takeIf { it.exists() }?.readText() }.getOrNull()
+        ?: runCatching { context.assets.open("medicines.json").bufferedReader().use { it.readText() } }.getOrNull()
 private suspend fun syncDataset(context: Context): Pair<List<Medicine>, String> = withContext(Dispatchers.IO) {
     val connection = URL(DATA_URL).openConnection() as HttpURLConnection
     try {
