@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
         Medicine("ORS","Oral Rehydration Salts","স্যাশে","Powder","বিভিন্ন প্রস্তুতকারক","প্যাকেটভেদে ভিন্ন","তথ্য যাচাই প্রয়োজন","—")
     ) }
     val filtered = sample.filter { (it.brand+" "+it.generic+" "+it.maker).contains(query,ignoreCase=true) }
+    val visibleMedicines = if (tab == 1) sample.filter { savedBrands.contains(it.brand) && (query.isBlank() || (it.brand+" "+it.generic+" "+it.maker).contains(query, ignoreCase=true)) } else filtered
+    fun openWeb(url: String) { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { pickedText = "লিংক খোলা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।" } }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) {
             pickedText = ""
@@ -99,6 +103,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 item {
+                    Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                            Text("সরকারি ওষুধের ডেটাবেস", fontSize=18.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.primary)
+                            Text("এই সংস্করণে পূর্ণ ডেটাবেস অ্যাপে ডাউনলোড হয়নি। সর্বশেষ নিবন্ধন ও প্রস্তুতকারকের তথ্য যাচাই করতে সরকারি তালিকা খুলুন।", fontSize=13.sp)
+                            Button(onClick={ openWeb("https://adr.dgdagov.info/medicines") }, modifier=Modifier.fillMaxWidth()) {
+                                Icon(Icons.Default.OpenInNew, contentDescription=null); Spacer(Modifier.width(8.dp)); Text("DGDA ওষুধের তালিকা খুলুন")
+                            }
+                            OutlinedButton(onClick={ openWeb("https://fhir.dghs.gov.bd/core/ValueSet-dgda-registered-drugs.html") }, modifier=Modifier.fillMaxWidth()) {
+                                Text("DGHS নিবন্ধিত ওষুধের রেজিস্ট্রি")
+                            }
+                            Text("দাম, উৎস ও যাচাইয়ের তারিখ ছাড়া কোনো রেকর্ডকে যাচাইকৃত বলা হবে না। এই লিংকগুলো অনলাইন ব্যবহার করে।", fontSize=11.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                item {
                     Card(shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),modifier=Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp)) {
                             Text("স্বাস্থ্য-নিরাপত্তা নোট",fontWeight=FontWeight.Bold)
@@ -114,7 +133,7 @@ class MainActivity : ComponentActivity() {
                         Text("ডেটাবেস ও মূল্য আপডেট এখনো সংযুক্ত নয়।",fontSize=13.sp)
                     } }
                 } else {
-                    items(if (tab == 1) filtered.filter { savedBrands.contains(it.brand) } else filtered) { med ->
+                    items(visibleMedicines) { med ->
                         Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                                 Row(verticalAlignment=Alignment.CenterVertically) {
@@ -130,7 +149,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    if((if (tab == 1) filtered.filter { savedBrands.contains(it.brand) } else filtered).isEmpty()) item { Text(if(tab==1) "এখনো কোনো ওষুধ সংরক্ষণ করা হয়নি। হোমে গিয়ে বুকমার্ক আইকনে চাপ দিন।" else "কোনো নমুনা মেলেনি। পূর্ণ ডেটাবেস এখনো যুক্ত হয়নি।") }
+                    if(visibleMedicines.isEmpty()) item { Text(if(tab==1) "এখনো কোনো সংরক্ষিত ওষুধ মেলেনি। হোমে গিয়ে বুকমার্ক আইকনে চাপ দিন।" else "কোনো নমুনা মেলেনি। পূর্ণ ডেটাবেস এখনো যুক্ত হয়নি।") }
                 }
                 item { Text("তথ্য-সংক্রান্ত অভিযোগ বা ভুল পেলে যাচাই করা সরকারি উৎসের সঙ্গে মিলিয়ে নিন।",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             }
