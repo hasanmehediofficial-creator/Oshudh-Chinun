@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -40,6 +41,13 @@ class MainActivity : ComponentActivity() {
     var showInfo by remember { mutableStateOf(false) }
     var pickedText by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("oshudh_chinun", Context.MODE_PRIVATE) }
+    var savedBrands by remember { mutableStateOf(prefs.getStringSet("saved_brands", emptySet())?.toSet() ?: emptySet()) }
+    fun toggleSaved(brand: String) {
+        val next = if (savedBrands.contains(brand)) savedBrands - brand else savedBrands + brand
+        savedBrands = next
+        prefs.edit().putStringSet("saved_brands", next).apply()
+    }
     val sample = remember { listOf(
         Medicine("Napa","Paracetamol","500 mg","Tablet","Beximco Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
         Medicine("Seclo","Omeprazole","20 mg","Capsule","Square Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
@@ -106,12 +114,12 @@ class MainActivity : ComponentActivity() {
                         Text("ডেটাবেস ও মূল্য আপডেট এখনো সংযুক্ত নয়।",fontSize=13.sp)
                     } }
                 } else {
-                    items(filtered) { med ->
-                        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().clickable { showInfo=true }) {
+                    items(if (tab == 1) filtered.filter { savedBrands.contains(it.brand) } else filtered) { med ->
+                        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                                 Row(verticalAlignment=Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) { Text(med.brand,fontSize=20.sp,fontWeight=FontWeight.Bold); Text(med.generic,color=MaterialTheme.colorScheme.primary) }
-                                    IconButton(onClick={showInfo=true}) { Icon(Icons.Default.BookmarkBorder,contentDescription="সংরক্ষণ") }
+                                    IconButton(onClick={toggleSaved(med.brand)}) { Icon(if(savedBrands.contains(med.brand)) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,contentDescription=if(savedBrands.contains(med.brand)) "সংরক্ষণ থেকে বাদ দিন" else "সংরক্ষণ করুন") }
                                 }
                                 Text("${med.strength} • ${med.form}")
                                 Text("প্রস্তুতকারক: ${med.maker}",fontSize=13.sp)
@@ -122,7 +130,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    if(filtered.isEmpty()) item { Text("কোনো নমুনা মেলেনি। পূর্ণ ডেটাবেস এখনো যুক্ত হয়নি।") }
+                    if((if (tab == 1) filtered.filter { savedBrands.contains(it.brand) } else filtered).isEmpty()) item { Text(if(tab==1) "এখনো কোনো ওষুধ সংরক্ষণ করা হয়নি। হোমে গিয়ে বুকমার্ক আইকনে চাপ দিন।" else "কোনো নমুনা মেলেনি। পূর্ণ ডেটাবেস এখনো যুক্ত হয়নি।") }
                 }
                 item { Text("তথ্য-সংক্রান্ত অভিযোগ বা ভুল পেলে যাচাই করা সরকারি উৎসের সঙ্গে মিলিয়ে নিন।",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             }
