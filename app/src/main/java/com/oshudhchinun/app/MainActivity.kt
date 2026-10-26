@@ -179,8 +179,8 @@ class MainActivity : ComponentActivity() {
                     Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
                             Text("অ্যাপের ভেতরেই ওষুধের তথ্য", fontSize=18.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.primary)
-                            Text("লক্ষ্য: সার্চ, বিস্তারিত তথ্য, সংরক্ষণ এবং মূল্য আপডেট—সব এই অ্যাপের ভেতরে। এখনকার সংস্করণে কেবল ৩টি UI নমুনা আছে; পূর্ণ সরকারি ডেটাবেস বা মূল্য-সিঙ্ক এখনো যুক্ত হয়নি।")
-                            Text("ডেটা অবস্থা: নমুনা • সর্বশেষ সফল আপডেট: নেই", fontSize=12.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("লক্ষ্য: সার্চ, বিস্তারিত তথ্য ও সংরক্ষণ—সব এই অ্যাপের ভেতরে। বর্তমানে ৫০০টি ক্যাটালগ রেকর্ড যুক্ত আছে; জেনেরিক নাম, বর্তমান দাম ও চিকিৎসাসংক্রান্ত তথ্যের যাচাই চলছে।")
+                            Text("ডেটা অবস্থা: ৫০০টি ক্যাটালগ রেকর্ড • সর্বশেষ সফল আপডেট: নেই", fontSize=12.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -188,7 +188,7 @@ class MainActivity : ComponentActivity() {
                     Card(shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),modifier=Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp)) {
                             Text("স্বাস্থ্য-নিরাপত্তা নোট",fontWeight=FontWeight.Bold)
-                            Text("এই অ্যাপ রোগ নির্ণয় বা ডোজ নির্ধারণ করে না। ওষুধ খাওয়ার আগে চিকিৎসক বা ফার্মাসিস্টের পরামর্শ নিন। নিচের রেকর্ডগুলো শুধু UI নমুনা; যাচাইকৃত ডেটাবেস নয়।",fontSize=13.sp)
+                            Text("এই অ্যাপ রোগ নির্ণয় বা ডোজ নির্ধারণ করে না। ৫০০টি ক্যাটালগ রেকর্ডে জেনেরিক নাম, দাম ও ক্লিনিক্যাল তথ্য সম্পূর্ণ যাচাই করা হয়নি। ওষুধ খাওয়ার আগে চিকিৎসক বা ফার্মাসিস্টের পরামর্শ নিন।",fontSize=13.sp)
                         }
                     }
                 }
