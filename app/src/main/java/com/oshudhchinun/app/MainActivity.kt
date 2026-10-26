@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
                             Text("ওষুধ খুঁজুন",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Green)
                             Text("ব্র্যান্ড, জেনেরিক বা প্রস্তুতকারকের নাম লিখুন।",color=Color(0xFF255C49))
                             OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),placeholder={Text("যেমন: Napa, Paracetamol")},leadingIcon={Icon(Icons.Default.Search,null)},singleLine=true)
-                            Button(onClick={ { photoPicker.launch("image/*") } },modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp)) { Icon(Icons.Default.PhotoCamera,null); Spacer(Modifier.width(8.dp)); Text("প্যাকেটের ছবি নির্বাচন করুন") }
+                            Button(onClick={ photoPicker.launch("image/*") },modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp)) { Icon(Icons.Default.PhotoCamera,null); Spacer(Modifier.width(8.dp)); Text("প্যাকেটের ছবি নির্বাচন করুন") }
                             if(pickedText.isNotBlank()) Text(pickedText,fontSize=13.sp,color=Green)
                         }
                     }
