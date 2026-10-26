@@ -22,8 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -40,7 +38,7 @@ class MainActivity : ComponentActivity() {
     var query by remember { mutableStateOf("") }
     var dark by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
-    var showInfo by remember { mutableStateOf(false) }
+    var selectedMedicine by remember { mutableStateOf<Medicine?>(null) }
     var pickedText by remember { mutableStateOf("") }
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("oshudh_chinun", Context.MODE_PRIVATE) }
@@ -57,7 +55,6 @@ class MainActivity : ComponentActivity() {
     ) }
     val filtered = sample.filter { (it.brand+" "+it.generic+" "+it.maker).contains(query,ignoreCase=true) }
     val visibleMedicines = if (tab == 1) sample.filter { savedBrands.contains(it.brand) && (query.isBlank() || (it.brand+" "+it.generic+" "+it.maker).contains(query, ignoreCase=true)) } else filtered
-    fun openWeb(url: String) { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { pickedText = "লিংক খোলা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।" } }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) {
             pickedText = ""
@@ -104,16 +101,10 @@ class MainActivity : ComponentActivity() {
                 }
                 item {
                     Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(9.dp)) {
-                            Text("সরকারি ওষুধের ডেটাবেস", fontSize=18.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.primary)
-                            Text("এই সংস্করণে পূর্ণ ডেটাবেস অ্যাপে ডাউনলোড হয়নি। সর্বশেষ নিবন্ধন ও প্রস্তুতকারকের তথ্য যাচাই করতে সরকারি তালিকা খুলুন।", fontSize=13.sp)
-                            Button(onClick={ openWeb("https://adr.dgdagov.info/medicines") }, modifier=Modifier.fillMaxWidth()) {
-                                Icon(Icons.Default.OpenInNew, contentDescription=null); Spacer(Modifier.width(8.dp)); Text("DGDA ওষুধের তালিকা খুলুন")
-                            }
-                            OutlinedButton(onClick={ openWeb("https://fhir.dghs.gov.bd/core/ValueSet-dgda-registered-drugs.html") }, modifier=Modifier.fillMaxWidth()) {
-                                Text("DGHS নিবন্ধিত ওষুধের রেজিস্ট্রি")
-                            }
-                            Text("দাম, উৎস ও যাচাইয়ের তারিখ ছাড়া কোনো রেকর্ডকে যাচাইকৃত বলা হবে না। এই লিংকগুলো অনলাইন ব্যবহার করে।", fontSize=11.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text("অ্যাপের ভেতরেই ওষুধের তথ্য", fontSize=18.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.primary)
+                            Text("লক্ষ্য: সার্চ, বিস্তারিত তথ্য, সংরক্ষণ এবং মূল্য আপডেট—সব এই অ্যাপের ভেতরে। এখনকার সংস্করণে কেবল ৩টি UI নমুনা আছে; পূর্ণ সরকারি ডেটাবেস বা মূল্য-সিঙ্ক এখনো যুক্ত হয়নি।")
+                            Text("ডেটা অবস্থা: নমুনা • সর্বশেষ সফল আপডেট: নেই", fontSize=12.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -134,7 +125,7 @@ class MainActivity : ComponentActivity() {
                     } }
                 } else {
                     items(visibleMedicines) { med ->
-                        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth()) {
+                        Card(shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().clickable { selectedMedicine = med }) {
                             Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                                 Row(verticalAlignment=Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) { Text(med.brand,fontSize=20.sp,fontWeight=FontWeight.Bold); Text(med.generic,color=MaterialTheme.colorScheme.primary) }
@@ -154,6 +145,28 @@ class MainActivity : ComponentActivity() {
                 item { Text("তথ্য-সংক্রান্ত অভিযোগ বা ভুল পেলে যাচাই করা সরকারি উৎসের সঙ্গে মিলিয়ে নিন।",fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
-        if(showInfo) AlertDialog(onDismissRequest={showInfo=false},title={Text("সংরক্ষণ সুবিধা")},text={Text("এই প্রাথমিক সংস্করণে সংরক্ষণ ও পূর্ণ ডেটাবেস এখনো চালু হয়নি।")},confirmButton={TextButton(onClick={showInfo=false}){Text("ঠিক আছে")}})
+        selectedMedicine?.let { med ->
+            AlertDialog(
+                onDismissRequest = { selectedMedicine = null },
+                title = { Text(med.brand, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("জেনেরিক: ${med.generic}")
+                        Text("শক্তি/ফর্ম: ${med.strength} • ${med.form}")
+                        Text("প্রস্তুতকারক: ${med.maker}")
+                        HorizontalDivider()
+                        Text("ব্যবহার / কী কাজে লাগে", fontWeight = FontWeight.Bold)
+                        Text("যাচাইকৃত তথ্য এখনো এই নমুনা রেকর্ডে যোগ করা হয়নি।")
+                        Text("পার্শ্বপ্রতিক্রিয়া ও সতর্কতা", fontWeight = FontWeight.Bold)
+                        Text("যাচাইকৃত তথ্য অনুপস্থিত—অনুমান করে দেখানো হচ্ছে না।")
+                        Text("মূল্য: ${med.price}")
+                        Text("উৎস: ${med.source}")
+                        Text("যাচাইয়ের তারিখ: ${med.checked}")
+                        Text("নিরাপত্তা: এই স্ক্রিন থেকে রোগ নির্ণয় বা ডোজ নির্ধারণ করা হয় না।")
+                    }
+                },
+                confirmButton = { TextButton(onClick = { selectedMedicine = null }) { Text("বন্ধ করুন") } }
+            )
+        }
     }
 }
