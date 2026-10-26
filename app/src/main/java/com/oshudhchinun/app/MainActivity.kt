@@ -20,6 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 private val Green = Color(0xFF087F5B)
 private val Pale = Color(0xFFE9F7F0)
@@ -35,6 +39,7 @@ class MainActivity : ComponentActivity() {
     var tab by remember { mutableStateOf(0) }
     var showInfo by remember { mutableStateOf(false) }
     var pickedText by remember { mutableStateOf("") }
+    val context = LocalContext.current
     val sample = remember { listOf(
         Medicine("Napa","Paracetamol","500 mg","Tablet","Beximco Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
         Medicine("Seclo","Omeprazole","20 mg","Capsule","Square Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
@@ -42,7 +47,24 @@ class MainActivity : ComponentActivity() {
     ) }
     val filtered = sample.filter { (it.brand+" "+it.generic+" "+it.maker).contains(query,ignoreCase=true) }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        pickedText = if (uri == null) "" else "ছবি নির্বাচন হয়েছে। ছবির লেখা শনাক্ত করার ফিচার পরবর্তী ধাপে যুক্ত হবে।"
+        if (uri == null) {
+            pickedText = ""
+        } else {
+            pickedText = "ছবির লেখা পড়া হচ্ছে…"
+            try {
+                val image = InputImage.fromFilePath(context, uri)
+                TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                    .process(image)
+                    .addOnSuccessListener { result ->
+                        val extracted = result.text.trim()
+                        pickedText = if (extracted.isBlank()) "ছবিতে পড়ার মতো লেখা পাওয়া যায়নি।" else "ছবি থেকে পাওয়া লেখা: $extracted"
+                        if (extracted.isNotBlank()) query = extracted.lines().first().take(80)
+                    }
+                    .addOnFailureListener { pickedText = "ছবির লেখা পড়া যায়নি। পরিষ্কার ছবি দিয়ে আবার চেষ্টা করুন।" }
+            } catch (e: Exception) {
+                pickedText = "ছবি খুলতে সমস্যা হয়েছে। অন্য ছবি নির্বাচন করুন।"
+            }
+        }
     }
     MaterialTheme(colorScheme = if(dark) darkColorScheme(primary=Color(0xFF69D6A5)) else lightColorScheme(primary=Green, secondary=Green)) {
         Scaffold(containerColor=MaterialTheme.colorScheme.background, bottomBar={
