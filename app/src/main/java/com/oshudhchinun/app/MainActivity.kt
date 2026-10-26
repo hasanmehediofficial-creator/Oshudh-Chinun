@@ -25,10 +25,50 @@ import android.content.Context
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.io.File
 
 private val Green = Color(0xFF087F5B)
 private val Pale = Color(0xFFE9F7F0)
 data class Medicine(val brand:String,val generic:String,val strength:String,val form:String,val maker:String,val price:String,val source:String,val checked:String)
+private const val DATA_URL = "https://raw.githubusercontent.com/hasanmehediofficial-creator/Oshudh-Chinun/main/data/medicines.json"
+private fun parseDataset(json: String): List<Medicine> {
+    val root = JSONObject(json)
+    val records = root.getJSONArray("records")
+    return (0 until records.length()).map { i ->
+        val item = records.getJSONObject(i)
+        fun value(key: String, fallback: String = "তথ্য নেই"): String {
+            val v = item.opt(key)
+            return if (v == null || v == JSONObject.NULL || v.toString().isBlank()) fallback else v.toString()
+        }
+        Medicine(value("brand", "নাম নেই"), value("generic"), value("strength"), value("form"),
+            value("manufacturer"), value("price", "দাম প্রকাশিত নয়"),
+            value("priceSource", "ডেটাসেটের উৎস যাচাই প্রয়োজন"),
+            value("clinicalReviewedAt", value("priceCheckedAt", "যাচাইয়ের তারিখ নেই")))
+    }
+}
+private fun readCachedDataset(context: Context): String? =
+    runCatching { File(context.filesDir, "medicines-cache.json").takeIf { it.exists() }?.readText() }.getOrNull()
+private suspend fun syncDataset(context: Context): Pair<List<Medicine>, String> = withContext(Dispatchers.IO) {
+    val connection = URL(DATA_URL).openConnection() as HttpURLConnection
+    try {
+        connection.connectTimeout = 10000
+        connection.readTimeout = 15000
+        connection.requestMethod = "GET"
+        connection.connect()
+        require(connection.responseCode in 200..299) { "Dataset server returned an error" }
+        val json = connection.inputStream.bufferedReader().use { it.readText() }
+        val parsed = parseDataset(json)
+        require(parsed.isNotEmpty()) { "Empty dataset" }
+        File(context.filesDir, "medicines-cache.json").writeText(json)
+        parsed to JSONObject(json).optString("datasetVersion", "অজানা")
+    } finally { connection.disconnect() }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { OshudhApp() } }
@@ -48,13 +88,48 @@ class MainActivity : ComponentActivity() {
         savedBrands = next
         prefs.edit().putStringSet("saved_brands", next).apply()
     }
-    val sample = remember { listOf(
-        Medicine("Napa","Paracetamol","500 mg","Tablet","Beximco Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
-        Medicine("Seclo","Omeprazole","20 mg","Capsule","Square Pharmaceuticals","যাচাই করা হয়নি","নমুনা রেকর্ড—সরকারি ডেটা নয়","—"),
-        Medicine("ORS","Oral Rehydration Salts","স্যাশে","Powder","বিভিন্ন প্রস্তুতকারক","প্যাকেটভেদে ভিন্ন","তথ্য যাচাই প্রয়োজন","—")
-    ) }
-    val filtered = sample.filter { (it.brand+" "+it.generic+" "+it.maker).contains(query,ignoreCase=true) }
-    val visibleMedicines = if (tab == 1) sample.filter { savedBrands.contains(it.brand) && (query.isBlank() || (it.brand+" "+it.generic+" "+it.maker).contains(query, ignoreCase=true)) } else filtered
+    var medicines by remember { mutableStateOf<List<Medicine>>(emptyList()) }
+    var dataStatus by remember { mutableStateOf("ডেটাসেট লোড হচ্ছে…") }
+    var syncing by remember { mutableStateOf(false) }
+    var lastSync by remember { mutableStateOf(prefs.getString("last_sync", "এখনো সফল আপডেট নেই") ?: "এখনো সফল আপডেট নেই") }
+    var datasetVersion by remember { mutableStateOf("অজানা") }
+    val scope = rememberCoroutineScope()
+    fun loadCachedDataset() {
+        val cached = readCachedDataset(context)
+        if (cached == null) {
+            dataStatus = "ক্যাশ নেই; অনলাইনে সংযোগের চেষ্টা চলছে"
+            return
+        }
+        runCatching { parseDataset(cached) }.onSuccess { records ->
+            medicines = records
+            datasetVersion = runCatching { JSONObject(cached).optString("datasetVersion", "অজানা") }.getOrDefault("অজানা")
+            dataStatus = "অফলাইন ক্যাশ • ${records.size}টি রেকর্ড"
+        }.onFailure { dataStatus = "ক্যাশের ডেটা পড়া যায়নি" }
+    }
+    fun refreshDataset() {
+        if (syncing) return
+        syncing = true
+        scope.launch {
+            try {
+                val (records, version) = syncDataset(context)
+                medicines = records
+                datasetVersion = version
+                val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+                lastSync = stamp
+                prefs.edit().putString("last_sync", stamp).apply()
+                dataStatus = "সিঙ্ক সফল • ${records.size}টি রেকর্ড"
+            } catch (_: Exception) {
+                if (medicines.isEmpty()) loadCachedDataset()
+                dataStatus = if (medicines.isEmpty()) "সিঙ্ক ব্যর্থ; ডেটা পাওয়া যায়নি" else "সিঙ্ক ব্যর্থ • ক্যাশ দেখানো হচ্ছে"
+            } finally { syncing = false }
+        }
+    }
+    LaunchedEffect(Unit) {
+        loadCachedDataset()
+        refreshDataset()
+    }
+    val filtered = medicines.filter { (it.brand+" "+it.generic+" "+it.maker).contains(query,ignoreCase=true) }
+    val visibleMedicines = if (tab == 1) medicines.filter { savedBrands.contains(it.brand) && (query.isBlank() || (it.brand+" "+it.generic+" "+it.maker).contains(query, ignoreCase=true)) } else filtered
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) {
             pickedText = ""
@@ -121,7 +196,9 @@ class MainActivity : ComponentActivity() {
                     Card { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         Text("অ্যাপ সেটিংস",fontWeight=FontWeight.Bold)
                         Row(verticalAlignment=Alignment.CenterVertically) { Text("ডার্ক মোড",Modifier.weight(1f)); Switch(checked=dark,onCheckedChange={dark=it}) }
-                        Text("ডেটাবেস ও মূল্য আপডেট এখনো সংযুক্ত নয়।",fontSize=13.sp)
+                        Text("ডেটাসেট সংস্করণ: $datasetVersion • $dataStatus",fontSize=13.sp)
+                        Text("সর্বশেষ সফল সিঙ্ক: $lastSync",fontSize=13.sp)
+                        Button(onClick = { refreshDataset() }, enabled = !syncing) { Text(if (syncing) "আপডেট হচ্ছে…" else "এখনই ডেটা আপডেট করুন") }
                     } }
                 } else {
                     items(visibleMedicines) { med ->
